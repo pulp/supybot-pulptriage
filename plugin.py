@@ -111,6 +111,7 @@ class PulpTriage(callbacks.Plugin):
                 self.carers.setdefault(issue_id, set()).add(msg.nick)
     @wrap
     def defer(self, irc, msg, args):
+        """Immediately defer the current issue until later in the current triage session."""
         if self.current_issue:
             self.deferred.add(self.current_issue)
         self.next(irc, msg, args)
@@ -228,6 +229,7 @@ class PulpTriage(callbacks.Plugin):
 
         @wrap
         def accept(self, irc, msg, args):
+            """Propose accepting the current issue in its current state."""
             self._set_proposal(irc, ('accept', 'Leave the issue as-is, accepting its current state.'))
 
         @wrap
