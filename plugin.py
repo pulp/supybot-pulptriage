@@ -186,7 +186,7 @@ class PulpTriage(callbacks.Plugin):
         """Immediately skip the current issue with no resolution."""
         self.next(irc, msg, args)
 
-    @wrap(['text'])
+    @wrap([optional('text')])
     def start(self, irc, msg, args, the_rest):
         """Start an IRC triage session. The person calling start becomes the chair."""
         self._reset()
