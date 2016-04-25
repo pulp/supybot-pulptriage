@@ -276,6 +276,8 @@ class PulpTriage(callbacks.Plugin):
         self.proposal = None
         self.triage_issues = None
 
+    # meetbot wrappers
+
     def _meetbot_call(self, irc, msg, new_command, args=None):
         # new_command is a meetbot command string, e.g. "#action user needs to do foo"
         # if args is passed, it needs to be a list.
@@ -303,13 +305,6 @@ class PulpTriage(callbacks.Plugin):
     def _meetbot_action(self, irc, msg, args):
         self._meetbot_call(irc, msg, "#action", args)
 
-    def _meetbot_addchair(self, irc, msg, args):
-        # anyone needs to be able to run this, so we need to poke at the meeting object directly
-        channel = msg.args[0]
-        network = irc.msg.tags['receivedOn']
-        nick = msg.nick
-        self._meetbot_meeting(irc, msg)
-
     def _meetbot_agreed(self, irc, msg, args):
         self._meetbot_call(irc, msg, "#agreed", args)
 
@@ -327,6 +322,16 @@ class PulpTriage(callbacks.Plugin):
 
     def _meetbot_link(self, irc, msg, args):
         self._meetbot_call(irc, msg, "#link", args)
+
+    def _meetbot_topic(self, irc, msg, args):
+        self._meetbot_call(irc, msg, "#topic", args)
+
+    def _meetbot_addchair(self, irc, msg, args):
+        # anyone needs to be able to run this, so we need to poke at the meeting object directly
+        channel = msg.args[0]
+        network = irc.msg.tags['receivedOn']
+        nick = msg.nick
+        self._meetbot_meeting(irc, msg)
 
     def _meetbot_startmeeting(self, irc, msg, the_rest):
         datestamp = time.strftime('%F')
@@ -360,10 +365,8 @@ class PulpTriage(callbacks.Plugin):
                 irc.reply('%s: Issue %d is currently being discussed.' % (care_nicks,
                                                                           self.current_issue))
 
-            if set_topic:
-                # the second line is the issue description and link, set the topic to that
-                channel = msg.args[0]
-                irc.queueMsg(ircmsgs.topic(channel, strings[1]))
+            if set_topic and len(strings) > 1:
+                self._meetbot_topic(irc, msg, [strings[1]])
 
     def _redmine_triage_issues(self, irc):
         report_id = self.registryValue('report_id')
