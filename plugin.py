@@ -60,6 +60,24 @@ class PulpTriage(callbacks.Plugin):
         self.__parent.__init__(irc)
         self._reset()
 
+    def _reset(self):
+        # current issue being triaged
+        self.current_issue = None
+        # nicks participating in the current triage
+        self.triagers = set()
+        # issues that have already been seen, useful for managing deferred and skipped issues
+        self.seen = set()
+        # issues that have been deferred, should get handled after all other issues are seen
+        self.deferred = set()
+        # dict of issues that nicks care about, key is issue int, value is a set of nicks
+        self.carers = {}
+        # if set, proposal should be a tuple of ('action', 'string'),
+        # where action is one of the strings handled in accept,
+        # and string is a human-readable description of the action proposed.
+        self.proposal = None
+        # The current list of issues in the triage issues list from redmine
+        self.triage_issues = None
+
     # command funcs
     @wrap
     def accept(self, irc, msg, args):
@@ -109,6 +127,7 @@ class PulpTriage(callbacks.Plugin):
         for issue_id in issue_ids:
             if self.triage_issues and issue_id in self.triage_issues:
                 self.carers.setdefault(issue_id, set()).add(msg.nick)
+
     @wrap
     def defer(self, irc, msg, args):
         """Immediately defer the current issue until later in the current triage session."""
@@ -128,15 +147,18 @@ class PulpTriage(callbacks.Plugin):
         self._announce_issue(irc, msg, issue_id)
 
     @wrap
-    def join(self, irc, msg, args):
-        """Join the current triage session. The meeting chair and anyone participating using
+    def here(self, irc, msg, args):
+        """Record a note in the meeting minutes that a user is present for this triage session
+        
+        The meeting chair and anyone participating using
         triage bot commands should be automatically added."""
-        self._meetbot_info(irc, msg, ["%s has joined triage"])
-
-    @wrap
-    def leave(self, irc, msg, args):
-        """Leave the current triage session."""
-        self.triagers.remove(msg.nick)
+        if msg.nick not in self.triagers:
+            self.triagers.add(msg.nick)
+            join_msg = "%s has joined triage" % msg.nick
+            self._meetbot_info(irc, msg, [join_msg])
+            irc.reply(join_msg)
+        else:
+            irc.reply('You have already joined this triage session.', private=True)
 
     @wrap
     def needhelp(self, irc, msg, args):
@@ -260,22 +282,6 @@ class PulpTriage(callbacks.Plugin):
         self.current_issue = issue_id
         self._redmine_report_issue(irc, msg, set_topic)
 
-    def _reset(self):
-        # current issue being triaged
-        self.current_issue = None
-        # nicks participating in the current triage
-        self.triagers = set()
-        # issues that have already been seen
-        self.seen = set()
-        # issues that have been deferred
-        self.deferred = set()
-        # dict of issues that nicks care about, key is issue int, value is a set of nicks
-        self.carers = {}
-        # if set, proposal should be a tuple of ('action', 'string'),
-        # where action is one of the strings handled in accept
-        self.proposal = None
-        self.triage_issues = None
-
     # meetbot wrappers
 
     def _meetbot_call(self, irc, msg, new_command, args=None):
@@ -290,7 +296,8 @@ class PulpTriage(callbacks.Plugin):
         meet_bot.doPrivmsg(irc, new_msg)
 
         # anyone participating in triage implicitly joins
-        self.triagers.add(msg.nick)
+        if msg.nick not in self.triagers:
+            self.here(irc, msg, [])
 
     def _meetbot_meeting(self, irc, msg):
         import MeetBot
