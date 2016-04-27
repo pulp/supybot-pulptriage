@@ -28,23 +28,29 @@
 
 ###
 import time
+from functools import wraps
 
-import supybot.utils as utils
-from supybot.commands import *
-import supybot.plugins as plugins
-import supybot.ircutils as ircutils
+import supybot.utils as utils  # NOQA
+from supybot.commands import *  # NOQA
+import supybot.plugins as plugins  # NOQA
+import supybot.ircutils as ircutils  # NOQA
 import supybot.callbacks as callbacks
 from supybot.ircmsgs import IrcMsg
 
 import simplejson as json
 
-try:
-    from supybot.i18n import PluginInternationalization
-    _ = PluginInternationalization('PulpTriage')
-except ImportError:
-    # Placeholder that allows to run the plugin on a bot
-    # without the i18n module
-    _ = lambda x: x
+
+def wrap_chair(func, *args, **kwargs):
+    # wrap a function with a "normal" supybot wrap that additionally
+    # checks that the caller is a meeting chair
+    # this cannot be used as a decorator, and must explicitly be used
+    # after the function definition to wrap the function
+    @wraps(func)
+    def wrapped(self, irc, msg, *wrapped_args, **wrapped_kwargs):
+        if msg.nick not in self.chairs:
+            irc.error('You are not the meeting chair.', private=True)
+        return func(self, irc, msg, *wrapped_args, **wrapped_kwargs)
+    return wrap(wrapped, *args, **kwargs)
 
 
 priorities = ['low', 'normal', 'high', 'urgent']
@@ -75,11 +81,13 @@ class PulpTriage(callbacks.Plugin):
         # where action is one of the strings handled in accept,
         # and string is a human-readable description of the action proposed.
         self.proposal = None
-        # The current list of issues in the triage issues list from redmine
+        # current list of issues in the triage issues list from redmine
         self.triage_issues = None
+        # set of meeting chair nicks
+        self.chairs = set()
 
     # command funcs
-    @wrap
+
     def accept(self, irc, msg, args):
         """Accepts the current proposed triage resolution."""
         if self.proposal is None:
@@ -100,6 +108,7 @@ class PulpTriage(callbacks.Plugin):
                 self.defer(irc, msg, args)
 
         # action methods should call "next", don't call it here.
+    accept = wrap_chair(accept)
 
     @wrap
     def action(self, irc, msg, args):
@@ -107,14 +116,18 @@ class PulpTriage(callbacks.Plugin):
         along with the action item in the meeting log."""
         self._meetbot_action(irc, msg, args)
 
-    @wrap(['admin'])
-    def addchair(self, irc, msg, args):
-        """Add yourself as the new triage chair.
+    @wrap(['admin', optional('nick')])
+    def addchair(self, irc, msg, args, nick):
+        """[nick]
+
+        Make yourself or a specified nick to the triage chair.
+
         This is generally only useful when the existing chair disappears for some reason, and
         someone needs to take over."""
+        self.chairs.add(msg.nick)
         self._meetbot_newchair(irc, msg, args)
 
-    @wrap
+    @wrap(['admin'])
     def announce(self, irc, msg, args):
         """Announce a future triage session to configured channels. But...currently it does nothing
         and you need to make the announcements yourself. Coming Soon!"""
@@ -122,34 +135,38 @@ class PulpTriage(callbacks.Plugin):
 
     @wrap([many('positiveInt')])
     def care(self, irc, msg, args, issue_ids):
-        """Express interest in a specific issue that will be triaged. When that issue is up for
+        """<issue_id>
+
+        Express interest in a specific issue that will be triaged. When that issue is up for
         discussion, users that !care about it will be pinged by nick."""
         for issue_id in issue_ids:
             if self.triage_issues and issue_id in self.triage_issues:
                 self.carers.setdefault(issue_id, set()).add(msg.nick)
 
-    @wrap
     def defer(self, irc, msg, args):
         """Immediately defer the current issue until later in the current triage session."""
         if self.current_issue:
             self.deferred.add(self.current_issue)
         self.next(irc, msg, args)
+    defer = wrap_chair(defer)
 
-    @wrap
     def end(self, irc, msg, args):
         """End the current meeting, if one is happening."""
         self._meetbot_endmeeting(irc, msg)
         self._reset()
+    end = wrap_chair(end)
 
-    @wrap(['positiveInt'])
     def issue(self, irc, msg, args, issue_id):
-        """Immediately switch to a specific redmine issue, abandoning the current issue."""
+        """<issue_id>
+
+        Immediately switch to a specific redmine issue, abandoning the current issue."""
         self._announce_issue(irc, msg, issue_id)
+    issue = wrap_chair(issue, ['positiveInt'])
 
     @wrap
     def here(self, irc, msg, args):
         """Record a note in the meeting minutes that a user is present for this triage session
-        
+
         The meeting chair and anyone participating using
         triage bot commands should be automatically added."""
         if msg.nick not in self.triagers:
@@ -165,7 +182,6 @@ class PulpTriage(callbacks.Plugin):
         """Register a call for help in the triage meeting minutes."""
         self._meetbot_help(irc, msg, args)
 
-    @wrap
     def next(self, irc, msg, args):
         """Advance to the next triage issue if a quorum is present."""
         # check the quorum
@@ -202,16 +218,20 @@ class PulpTriage(callbacks.Plugin):
         except IndexError:
             irc.reply('No issues left to triage.')
             return
+    next = wrap_chair(next)
 
-    @wrap
     def skip(self, irc, msg, args):
         """Immediately skip the current issue with no resolution."""
         self.next(irc, msg, args)
+    skip = wrap_chair(skip)
 
     @wrap([optional('text')])
     def start(self, irc, msg, args, the_rest):
-        """Start an IRC triage session. The person calling start becomes the chair."""
+        """[text] - optional additional text to include in the meeting topic
+
+        Start an IRC triage session. The person calling start becomes the chair."""
         self._reset()
+        self.chairs.add(msg.nick)
         self._meetbot_startmeeting(irc, msg, the_rest)
         self._refresh_triage_issues(irc)
 
@@ -243,7 +263,10 @@ class PulpTriage(callbacks.Plugin):
         # for priority, severity, and traget release from Redmine.
         @wrap(['something', 'something', additional('something')])
         def triage(self, irc, msg, args, priority, severity, target_release):
-            """Propose triage values including priority, severity, and an optional target release."""
+            """<priority> <severity> [target_release]
+
+            Propose triage values including priority, severity, and an optional target release.
+            """
             proposal = 'Priority: %s, Severity %s' % (priority, severity)
             if target_release:
                 proposal += ' Target Platform Release: %s' % target_release
@@ -252,7 +275,8 @@ class PulpTriage(callbacks.Plugin):
         @wrap
         def accept(self, irc, msg, args):
             """Propose accepting the current issue in its current state."""
-            self._set_proposal(irc, ('accept', 'Leave the issue as-is, accepting its current state.'))
+            self._set_proposal(irc,
+                               ('accept', 'Leave the issue as-is, accepting its current state.'))
 
         @wrap
         def defer(self, irc, msg, args):
@@ -267,7 +291,8 @@ class PulpTriage(callbacks.Plugin):
         @wrap
         def needinfo(self, irc, msg, args):
             """Propose that the current issue cannot be triaged without more info."""
-            self._set_proposal(irc, ('needinfo', 'This issue cannot be triaged without more info.'))
+            self._set_proposal(irc,
+                               ('needinfo', 'This issue cannot be triaged without more info.'))
 
         def _set_proposal(self, irc, proposal):
             irc.getCallback('PulpTriage').proposal = proposal
@@ -276,6 +301,7 @@ class PulpTriage(callbacks.Plugin):
     propose = Propose
 
     # command helpers
+
     def _announce_issue(self, irc, msg, issue_id, set_topic=True):
         # tiny wrapper to make it easy for commands to set the current issue,
         # announce it, and optionally set the topic.
@@ -338,7 +364,15 @@ class PulpTriage(callbacks.Plugin):
         channel = msg.args[0]
         network = irc.msg.tags['receivedOn']
         nick = msg.nick
-        self._meetbot_meeting(irc, msg)
+
+        meeting_key = (channel, network)
+        meeting = meeting_cache.get(meeting_key, None)
+        if not M:
+            # No meeting, nothing to do.
+            return
+
+        meeting.chairs.setdefault(nick, True)
+        irc.reply("Chair added: %s on (%s, %s)." % (nick, channel, network))
 
     def _meetbot_startmeeting(self, irc, msg, the_rest):
         datestamp = time.strftime('%F')
