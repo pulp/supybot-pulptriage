@@ -128,7 +128,8 @@ class PulpTriage(callbacks.Plugin):
         This is generally only useful when the existing chair disappears for some reason, and
         someone needs to take over."""
         self.chairs.add(msg.nick)
-        self._meetbot_newchair(irc, msg, args)
+        # this is broken, see the comment in addchair
+        # self._meetbot_addchair(irc, msg, args)
 
     @wrap(['admin'])
     def announce(self, irc, msg, args):
@@ -344,6 +345,7 @@ class PulpTriage(callbacks.Plugin):
         self._meetbot_call(irc, msg, "#topic", args)
 
     def _meetbot_addchair(self, irc, msg, args):
+        # XXX: Currently doesn't work because I don't know how to get at meetbot's cache
         # anyone needs to be able to run this, so we need to poke at the meeting object directly
         channel = msg.args[0]
         network = irc.msg.tags['receivedOn']
