@@ -164,7 +164,7 @@ class PulpTriage(callbacks.Plugin):
 
         Immediately switch to a specific redmine issue, abandoning the current issue."""
         self.current_issue = issue_id
-        self._redmine_report_issue(irc, msg, set_topic=True)
+        self._redmine_report_issue(irc, msg)
     issue = wrap_chair(issue, ['positiveInt'])
 
     @wrap
@@ -376,7 +376,7 @@ class PulpTriage(callbacks.Plugin):
             raise
         return result
 
-    def _redmine_report_issue(self, irc, msg, set_topic=False):
+    def _redmine_report_issue(self, irc, msg):
         if self.current_issue:
             redmine = irc.getCallback('PulpRedmine')
             strings = redmine.getBugs([self.current_issue])
@@ -390,8 +390,7 @@ class PulpTriage(callbacks.Plugin):
                 irc.reply('%s: Issue %d is currently being discussed.' % (care_nicks,
                                                                           self.current_issue))
 
-            if set_topic and len(strings) > 1:
-                self._meetbot_topic(irc, msg, [strings[1]])
+            self._meetbot_topic(irc, msg, [strings[1]])
 
     def _redmine_triage_issues(self, irc):
         report_id = self.registryValue('report_id')
