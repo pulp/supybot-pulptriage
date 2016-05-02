@@ -90,7 +90,9 @@ class PulpTriage(callbacks.Plugin):
     # command funcs
 
     def accept(self, irc, msg, args):
-        """Accepts the current proposed triage resolution."""
+        """(chair only)
+
+        Accepts the current proposed triage resolution."""
         if self.proposal is None:
             irc.reply('No action proposed, nothing to accept.')
         else:
@@ -119,21 +121,23 @@ class PulpTriage(callbacks.Plugin):
         along with the action item in the meeting log."""
         self._meetbot_action(irc, msg, args, text)
 
-    @wrap(['admin', optional('nick')])
+    @wrap(['admin', 'nickInChannel'])
     def addchair(self, irc, msg, args, nick):
-        """[nick]
+        """<nick> (admin-only command)
 
         Make yourself or a specified nick to the triage chair.
 
         This is generally only useful when the existing chair disappears for some reason, and
         someone needs to take over."""
-        self.chairs.add(msg.nick)
+        self.chairs.add(nick)
         # this is broken, see the comment in addchair
         # self._meetbot_addchair(irc, msg, args)
 
     @wrap(['admin'])
     def announce(self, irc, msg, args):
-        """Announce a future triage session to configured channels. But...currently it does nothing
+        """(admin-only command)
+
+        Announce a future triage session to configured channels. But...currently it does nothing
         and you need to make the announcements yourself. Coming Soon!"""
         pass
 
@@ -148,7 +152,9 @@ class PulpTriage(callbacks.Plugin):
                 self.carers.setdefault(issue_id, set()).add(msg.nick)
 
     def defer(self, irc, msg, args):
-        """Immediately defer the current issue until later in the current triage session."""
+        """(chair only)
+
+        Immediately defer the current issue until later in the current triage session."""
         if self.current_issue:
             self.deferred.add(self.current_issue)
         self.next(irc, msg, args)
@@ -170,10 +176,11 @@ class PulpTriage(callbacks.Plugin):
 
     @wrap
     def here(self, irc, msg, args):
-        """Record a note in the meeting minutes that a user is present for this triage session
+        """mark yourself present for triage
 
-        The meeting chair and anyone participating using
-        triage bot commands should be automatically added."""
+        Records a note in the meeting minutes that you are present for this triage session.
+        The meeting chair and anyone participating using triage bot commands should be
+        automatically added."""
         if msg.nick not in self.triagers:
             self.triagers.add(msg.nick)
             join_msg = "%s has joined triage" % msg.nick
@@ -190,7 +197,9 @@ class PulpTriage(callbacks.Plugin):
         self._meetbot_help(irc, msg, args, text)
 
     def next(self, irc, msg, args):
-        """Advance to the next triage issue if a quorum is present."""
+        """(chair only)
+
+        Advance to the next triage issue if a quorum is present."""
         # check the quorum
         if not self._quorum:
             irc.error('No quorum, more triagers need to !here to proceed.')
@@ -224,7 +233,9 @@ class PulpTriage(callbacks.Plugin):
     next = wrap_chair(next)
 
     def skip(self, irc, msg, args):
-        """Immediately skip the current issue with no resolution."""
+        """(chair only)
+
+        Immediately skip the current issue with no resolution."""
         self.next(irc, msg, args)
     skip = wrap_chair(skip)
 
@@ -232,7 +243,7 @@ class PulpTriage(callbacks.Plugin):
     def start(self, irc, msg, args, the_rest):
         """[text] - optional additional text to include in the meeting topic
 
-        Start an IRC triage session. The person calling start becomes the chair."""
+        Start an IRC triage session. The person calling start becomes a meeting chair."""
         self._reset()
         self.chairs.add(msg.nick)
         self._meetbot_startmeeting(irc, msg, the_rest)
