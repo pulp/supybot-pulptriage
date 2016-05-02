@@ -161,7 +161,8 @@ class PulpTriage(callbacks.Plugin):
         """<issue_id>
 
         Immediately switch to a specific redmine issue, abandoning the current issue."""
-        self._announce_issue(irc, msg, issue_id)
+        self.current_issue = issue_id
+        self._redmine_report_issue(irc, msg, set_topic=True)
     issue = wrap_chair(issue, ['positiveInt'])
 
     @wrap
@@ -187,18 +188,11 @@ class PulpTriage(callbacks.Plugin):
         """Advance to the next triage issue if a quorum is present."""
         # check the quorum
         if not self._quorum:
-            irc.error('No quorum, more triagers need to !join to proceed.')
+            irc.error('No quorum, more triagers need to !here to proceed.')
             return
 
-        # mark the previous issue as seen
-        if self.current_issue is not None:
-            self.seen.add(self.current_issue)
-            self.current_issue = None
-
         # take the triage issues list and push the deferred issues to the back
-        if self.triage_issues is None:
-            self._refresh_triage_issues(irc)
-
+        self._refresh_triage_issues(irc)
         triage_issues = []
         deferred = []
         for issue in self.triage_issues:
@@ -210,15 +204,18 @@ class PulpTriage(callbacks.Plugin):
                 triage_issues.append(issue)
         triage_issues.extend(deferred)
 
-        # triage the first issue
+        # mark the previous issue as seen
+        if self.current_issue is not None:
+            self.seen.add(self.current_issue)
+            self.current_issue = None
+
+        # triage the next issue
         try:
-            # this could be its own method
-            num_left = len(self.triage_issues) - len(self.seen)
-            irc.reply('%d issues left to triage.' % num_left)
-            self._announce_issue(irc, msg, triage_issues[0])
+            self.current_issue = triage_issues[0]
+            irc.reply('%d issues left to triage.' % len(triage_issues))
+            self._redmine_report_issue(irc, msg)
         except IndexError:
             irc.reply('No issues left to triage.')
-            return
     next = wrap_chair(next)
 
     def skip(self, irc, msg, args):
@@ -240,18 +237,6 @@ class PulpTriage(callbacks.Plugin):
     def suggest(self, irc, msg, args):
         """Suggest an idea, which will be recorded into the triage meeting minutes."""
         self._meetbot_idea(irc, msg, args)
-
-    @wrap
-    def untriaged(self, irc, msg, args):
-        """Print the current list of untriaged redmine issues"""
-        issues = self._redmine_triage_issues(irc)
-        if issues:
-            issues = filter(lambda i: i not in self.seen, issues)
-            num = len(issues)
-            formatted = '%d Untriaged issues: %s' % (num, ', '.join(map(str, issues)))
-            irc.reply(formatted)
-        else:
-            irc.reply('No untriaged issues remain.')
 
     @property
     def _quorum(self):
@@ -300,14 +285,6 @@ class PulpTriage(callbacks.Plugin):
             irc.reply('Proposed - %s' % proposal[1])
 
     propose = Propose
-
-    # command helpers
-
-    def _announce_issue(self, irc, msg, issue_id, set_topic=True):
-        # tiny wrapper to make it easy for commands to set the current issue,
-        # announce it, and optionally set the topic.
-        self.current_issue = issue_id
-        self._redmine_report_issue(irc, msg, set_topic)
 
     # meetbot wrappers
 
@@ -414,7 +391,8 @@ class PulpTriage(callbacks.Plugin):
         report_id = self.registryValue('report_id')
         result = self._redmine_query(irc, '/issues.json', query_id=report_id)
         if 'issues' in result:
-            return [int(issue['id']) for issue in result['issues']]
+            for issue in result['issues']:
+                yield issue['id']
         else:
             irc.error('Unable to fetch issues list from Redmine.')
 
