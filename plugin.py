@@ -237,7 +237,7 @@ class PulpTriage(callbacks.Plugin):
         self._meetbot_startmeeting(irc, msg, the_rest)
         self._refresh_triage_issues(irc)
 
-    @wrap('text')
+    @wrap(['text'])
     def suggest(self, irc, msg, args, text):
         """<text>
 
