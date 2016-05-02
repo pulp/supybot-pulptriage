@@ -49,7 +49,8 @@ def wrap_chair(func, *args, **kwargs):
     def wrapped(self, irc, msg, *wrapped_args, **wrapped_kwargs):
         if msg.nick not in self.chairs:
             irc.error('You are not the meeting chair.', private=True)
-        return func(self, irc, msg, *wrapped_args, **wrapped_kwargs)
+        else:
+            return func(self, irc, msg, *wrapped_args, **wrapped_kwargs)
     return wrap(wrapped, *args, **kwargs)
 
 
