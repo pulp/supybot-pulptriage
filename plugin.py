@@ -111,11 +111,13 @@ class PulpTriage(callbacks.Plugin):
         # action methods should call "next", don't call it here.
     accept = wrap_chair(accept)
 
-    @wrap
-    def action(self, irc, msg, args):
-        """Record an action item in the meeting log. Any nicks seen in the line will be recorded
+    @wrap(['text'])
+    def action(self, irc, msg, args, text):
+        """<text>
+
+        Record an action item in the meeting log. Any nicks seen in the line will be recorded
         along with the action item in the meeting log."""
-        self._meetbot_action(irc, msg, args)
+        self._meetbot_action(irc, msg, args, text)
 
     @wrap(['admin', optional('nick')])
     def addchair(self, irc, msg, args, nick):
@@ -178,10 +180,12 @@ class PulpTriage(callbacks.Plugin):
         else:
             irc.reply('You have already joined this triage session.', private=True)
 
-    @wrap
-    def needhelp(self, irc, msg, args):
-        """Register a call for help in the triage meeting minutes."""
-        self._meetbot_help(irc, msg, args)
+    @wrap(['text'])
+    def needhelp(self, irc, msg, args, text):
+        """<text>
+
+        Register a call for help in the triage meeting minutes."""
+        self._meetbot_help(irc, msg, args, text)
 
     def next(self, irc, msg, args):
         """Advance to the next triage issue if a quorum is present."""
@@ -236,10 +240,12 @@ class PulpTriage(callbacks.Plugin):
         self._meetbot_startmeeting(irc, msg, the_rest)
         self._refresh_triage_issues(irc)
 
-    @wrap
-    def suggest(self, irc, msg, args):
-        """Suggest an idea, which will be recorded into the triage meeting minutes."""
-        self._meetbot_idea(irc, msg, args)
+    @wrap('text')
+    def suggest(self, irc, msg, args, text):
+        """<text>
+
+        Suggest an idea, which will be recorded into the triage meeting minutes."""
+        self._meetbot_idea(irc, msg, args, text)
 
     @wrap
     def untriaged(self, irc, msg, args):
@@ -336,20 +342,20 @@ class PulpTriage(callbacks.Plugin):
             irc.reply("No currently active meetings.")
         return meeting
 
-    def _meetbot_action(self, irc, msg, args):
-        self._meetbot_call(irc, msg, "#action", args)
+    def _meetbot_action(self, irc, msg, args, text):
+        self._meetbot_call(irc, msg, "#action", [text])
+
+    def _meetbot_help(self, irc, msg, args, text):
+        self._meetbot_call(irc, msg, "#help", [text])
+
+    def _meetbot_idea(self, irc, msg, args, text):
+        self._meetbot_call(irc, msg, "#idea", [text])
 
     def _meetbot_agreed(self, irc, msg, args):
         self._meetbot_call(irc, msg, "#agreed", args)
 
     def _meetbot_endmeeting(self, irc, msg):
         self._meetbot_call(irc, msg, "#endmeeting")
-
-    def _meetbot_help(self, irc, msg, args):
-        self._meetbot_call(irc, msg, "#help", args)
-
-    def _meetbot_idea(self, irc, msg, args):
-        self._meetbot_call(irc, msg, "#idea", args)
 
     def _meetbot_info(self, irc, msg, args):
         self._meetbot_call(irc, msg, "#info", args)
