@@ -341,7 +341,9 @@ class PulpTriage(callbacks.Plugin):
 
         @wrap(['text'])
         def other(self, irc, msg, args, text):
-            """Propose another resolution for the current issue not supported by this bot"""
+            """<text>
+
+            Propose another resolution for the current issue not supported by this bot"""
             self._set_proposal(irc, ('other', text))
 
         def _set_proposal(self, irc, proposal):
