@@ -54,6 +54,9 @@ def wrap_chair(func, *args, **kwargs):
     return wrap(wrapped, *args, **kwargs)
 
 
+# We could (should?) pull these from redmine when triage starts,
+# but for now it's probably alright to hardcode them here and save
+# a couple of web requests
 priorities = ['low', 'normal', 'high', 'urgent']
 severities = ['low', 'medium', 'high', 'urgent']
 
@@ -101,14 +104,14 @@ class PulpTriage(callbacks.Plugin):
 
             irc.reply('Current proposal accepted: %s' % proposal_msg)
             self._meetbot_agreed(irc, msg, [proposal_msg])
-            if action in ('skip', 'accept', 'triage'):
-                # since the bot doesn't touch redmine, all of these do the same thing.
+            if action == 'defer':
+                self.defer(irc, msg, args)
+            else:
+                # since the bot doesn't touch redmine, all non-defer options just skip
                 # if the bot *did* touch redmine, skip would do nothing, whereas accept
                 # would mark the bug triaged, and triage would additional set prio, sev,
                 # and target release if specified
                 self.skip(irc, msg, args)
-            elif action == 'defer':
-                self.defer(irc, msg, args)
 
         # action methods should call "next", don't call it here.
     accept = wrap_chair(accept)
@@ -271,6 +274,44 @@ class PulpTriage(callbacks.Plugin):
 
             Propose triage values including priority, severity, and an optional target release.
             """
+            # validate prio and sev
+            # supybot can do this in advance with better contexts than "something",
+            # but this will do in the meantime
+            priority = priority.lower()
+
+            # special handling to deal with "normal/medium" confusion
+            if priority.startswith('med'):
+                priority = 'normal'
+            if severity.startswith('norm'):
+                severity = 'medium'
+
+            for redmine_priority in priorities:
+                if redmine_priority.startswith(priority):
+                    priority = redmine_priority.title()
+                    break
+            else:
+                priority = None
+
+            for redmine_severity in priorities:
+                if redmine_severity.startswith(severity):
+                    severity = redmine_severity.title()
+                    break
+            else:
+                severity = None
+
+            # excessivly verbose error handling
+            if not all((priority, severity)):
+                # need both to proceed, but need to sniff around to
+                # find the right error message
+                if not priority and not severity:
+                    errmsg = 'Unknown Priority & Severity'
+                elif not priority:
+                    errmsg = 'Unknown Priority'
+                else:
+                    errmsg = 'Unknown Severity'
+                irc.error(errmsg)
+                return
+
             proposal = 'Priority: %s, Severity %s' % (priority, severity)
             if target_release:
                 proposal += ' Target Platform Release: %s' % target_release
@@ -297,6 +338,11 @@ class PulpTriage(callbacks.Plugin):
             """Propose that the current issue cannot be triaged without more info."""
             self._set_proposal(irc,
                                ('needinfo', 'This issue cannot be triaged without more info.'))
+
+        @wrap(['text'])
+        def other(self, irc, msg, args, text):
+            """Propose another resolution for the current issue not supported by this bot"""
+            self._set_proposal(irc, ('other', text))
 
         def _set_proposal(self, irc, proposal):
             irc.getCallback('PulpTriage').proposal = proposal
