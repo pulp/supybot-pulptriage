@@ -280,7 +280,7 @@ class PulpTriage(callbacks.Plugin):
             else:
                 priority = None
 
-            for redmine_severity in priorities:
+            for redmine_severity in severities:
                 if redmine_severity.startswith(severity):
                     severity = redmine_severity.title()
                     break
@@ -300,31 +300,31 @@ class PulpTriage(callbacks.Plugin):
                 irc.error(errmsg)
                 return
 
-            proposal = 'Priority: %s, Severity %s' % (priority, severity)
+            proposal = 'Priority: %s, Severity: %s' % (priority, severity)
             if target_release:
-                proposal += ' Target Platform Release: %s' % target_release
-            self._set_proposal(irc, ('triage', proposal))
+                proposal += ', Target Platform Release: %s' % target_release
+            self._set_proposal(irc, msg, ('triage', proposal))
 
         @wrap
         def accept(self, irc, msg, args):
             """Propose accepting the current issue in its current state."""
-            self._set_proposal(irc,
+            self._set_proposal(irc, msg,
                                ('accept', 'Leave the issue as-is, accepting its current state.'))
 
         @wrap
         def defer(self, irc, msg, args):
             """Propose deferring the current issue until later in triage."""
-            self._set_proposal(irc, ('defer', 'Defer this issue until later in triage.'))
+            self._set_proposal(irc, msg, ('defer', 'Defer this issue until later in triage.'))
 
         @wrap
         def skip(self, irc, msg, args):
             """Propose skipping the current issue for this triage session."""
-            self._set_proposal(irc, ('skip', 'Skip this issue for this triage session.'))
+            self._set_proposal(irc, msg, ('skip', 'Skip this issue for this triage session.'))
 
         @wrap
         def needinfo(self, irc, msg, args):
             """Propose that the current issue cannot be triaged without more info."""
-            self._set_proposal(irc,
+            self._set_proposal(irc, msg,
                                ('needinfo', 'This issue cannot be triaged without more info.'))
 
         @wrap(['text'])
@@ -332,11 +332,18 @@ class PulpTriage(callbacks.Plugin):
             """<text>
 
             Propose another resolution for the current issue not supported by this bot"""
-            self._set_proposal(irc, ('other', text))
+            self._set_proposal(irc, msg, ('other', text))
 
-        def _set_proposal(self, irc, proposal):
-            irc.getCallback('PulpTriage').proposal = proposal
-            irc.reply('Proposed - %s' % proposal[1])
+        def _set_proposal(self, irc, msg, proposal):
+            triage = irc.getCallback('PulpTriage')
+            if triage.current_issue:
+                proposal_msg = 'Proposed for #{issue}: {text}'.format(
+                    issue=triage.current_issue, text=proposal[1])
+                triage.proposal = proposal
+                triage._meetbot_idea(irc, msg, [], proposal_msg)
+                irc.reply(proposal_msg)
+            else:
+                irc.error('No current issue, proposal ignored.')
 
     propose = Propose
 
