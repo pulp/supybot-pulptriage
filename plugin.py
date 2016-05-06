@@ -217,8 +217,9 @@ class PulpTriage(callbacks.Plugin):
         # triage the next issue
         self._refresh_triage_issues(irc)
         try:
-            self.current_issue = triage_issues[0]
-            irc.reply('%d issues left to triage.' % len(triage_issues))
+            self.current_issue = self.triage_issues[0]
+            irc.reply('%d issues left to triage: %s' % (
+                      len(self.triage_issues), ', '.join(map(str, self.triage_issues))))
             self._redmine_report_issue(irc, msg)
         except IndexError:
             irc.reply('No issues to triage.')
