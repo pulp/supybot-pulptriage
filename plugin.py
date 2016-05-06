@@ -69,6 +69,7 @@ class PulpTriage(callbacks.Plugin):
         self.__parent = super(PulpTriage, self)
         self.__parent.__init__(irc)
         self._reset()
+        self._last_proposal_time = time.time()
 
     def _reset(self):
         # current issue being triaged
@@ -335,15 +336,21 @@ class PulpTriage(callbacks.Plugin):
             self._set_proposal(irc, msg, ('other', text))
 
         def _set_proposal(self, irc, msg, proposal):
-            triage = irc.getCallback('PulpTriage')
-            if triage.current_issue:
-                proposal_msg = 'Proposed for #{issue}: {text}'.format(
-                    issue=triage.current_issue, text=proposal[1])
-                triage.proposal = proposal
-                triage._meetbot_idea(irc, msg, [], proposal_msg)
-                irc.reply(proposal_msg)
+            if now - self._last_proposal < self.registryValue('proposal_timeout'):
+                errmsg = ('Too many proposals at once, please submit your proposal '
+                          'again in a few seconds.')
+                irc.error(errmsg, private=True)
             else:
-                irc.error('No current issue, proposal ignored.')
+                self._last_proposal = now
+                triage = irc.getCallback('PulpTriage')
+                if triage.current_issue:
+                    proposal_msg = 'Proposed for #{issue}: {text}'.format(
+                        issue=triage.current_issue, text=proposal[1])
+                    triage.proposal = proposal
+                    triage._meetbot_idea(irc, msg, [], proposal_msg)
+                    irc.reply(proposal_msg)
+                else:
+                    irc.error('No current issue, proposal ignored.')
 
     propose = Propose
 

@@ -54,6 +54,11 @@ conf.registerGlobalValue(
     quorum. New issues will not be submitted for triage if the number of
     triaging users goes below this count."""))
 conf.registerGlobalValue(
+    PulpTriage, 'proposal_timeout',
+    registry.NonNegativeInteger(2, """Number of seconds to wait after
+    accepting a proposal before accepting another (prevents confusion
+    by only accepting one proposal at a time)"""))
+conf.registerGlobalValue(
     PulpTriage, 'report_id',
     registry.NonNegativeInteger(30, """ID of the Redmine report containing
     non-triaged issues"""))
