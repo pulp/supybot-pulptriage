@@ -208,31 +208,19 @@ class PulpTriage(callbacks.Plugin):
             irc.error('No quorum, more triagers need to !here to proceed.')
             return
 
-        # take the triage issues list and push the deferred issues to the back
-        self._refresh_triage_issues(irc)
-        triage_issues = []
-        deferred = []
-        for issue in self.triage_issues:
-            if issue in self.seen or issue == self.current_issue:
-                continue
-            if issue in self.deferred:
-                deferred.append(issue)
-            else:
-                triage_issues.append(issue)
-        triage_issues.extend(deferred)
-
         # mark the previous issue as seen
         if self.current_issue is not None:
             self.seen.add(self.current_issue)
             self.current_issue = None
 
         # triage the next issue
+        self._refresh_triage_issues(irc)
         try:
             self.current_issue = triage_issues[0]
             irc.reply('%d issues left to triage.' % len(triage_issues))
             self._redmine_report_issue(irc, msg)
         except IndexError:
-            irc.reply('No issues left to triage.')
+            irc.reply('No issues to triage.')
     next = wrap_chair(next)
 
     def skip(self, irc, msg, args):
@@ -463,7 +451,19 @@ class PulpTriage(callbacks.Plugin):
             irc.error('Unable to fetch issues list from Redmine.')
 
     def _refresh_triage_issues(self, irc):
-        self.triage_issues = self._redmine_triage_issues(irc)
+        # take the triage issues list and push the deferred issues to the back
+        all_triage_issues = self._redmine_triage_issues(irc)
+        triage_issues = []
+        deferred = []
+        for issue in all_triage_issues:
+            if issue in self.seen or issue == self.current_issue:
+                continue
+            if issue in self.deferred:
+                deferred.append(issue)
+            else:
+                triage_issues.append(issue)
+        triage_issues.extend(deferred)
+        self.triage_issues = triage_issues
 
 Class = PulpTriage
 
