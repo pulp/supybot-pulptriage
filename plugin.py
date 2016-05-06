@@ -337,6 +337,7 @@ class PulpTriage(callbacks.Plugin):
             self._set_proposal(irc, msg, ('other', text))
 
         def _set_proposal(self, irc, msg, proposal):
+            now = time.time()
             if now - self._last_proposal < self.registryValue('proposal_timeout'):
                 errmsg = ('Too many proposals at once, please submit your proposal '
                           'again in a few seconds.')
