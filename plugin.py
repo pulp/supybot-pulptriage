@@ -268,6 +268,7 @@ class PulpTriage(callbacks.Plugin):
             # supybot can do this in advance with better contexts than "something",
             # but this will do in the meantime
             priority = priority.lower()
+            severity = severity.lower()
 
             # special handling to deal with "normal/medium" confusion
             if priority.startswith('med'):
