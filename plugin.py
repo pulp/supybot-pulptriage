@@ -249,6 +249,10 @@ class PulpTriage(callbacks.Plugin):
         Suggest an idea, which will be recorded into the triage meeting minutes."""
         self._meetbot_idea(irc, msg, args, text)
 
+    @wrap
+    def yodel(self, irc, msg, args):
+        irc.reply('Holleri du dödel di diri diri dudel dö')
+
     @property
     def _quorum(self):
         quorum_count = self.registryValue('quorum_count')
