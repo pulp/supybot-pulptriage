@@ -432,7 +432,7 @@ class PulpTriage(callbacks.Plugin):
         self._meetbot_call(irc, msg, msgstr)
 
     def _redmine_query(self, irc, url, **kwargs):
-        redmine = irc.getCallback('PulpRedmine')
+        redmine = irc.getCallback('Redmine')
         response = redmine.resource.get(url, **kwargs)
         try:
             result = json.loads(response.body_string())
@@ -444,7 +444,7 @@ class PulpTriage(callbacks.Plugin):
 
     def _redmine_report_issue(self, irc, msg):
         if self.current_issue:
-            redmine = irc.getCallback('PulpRedmine')
+            redmine = irc.getCallback('Redmine')
             strings = redmine.getBugs([self.current_issue])
             for line in strings:
                 irc.reply(line, prefixNick=False)
