@@ -60,7 +60,7 @@ conf.registerGlobalValue(
     by only accepting one proposal at a time)"""))
 conf.registerGlobalValue(
     PulpTriage, 'report_id',
-    registry.NonNegativeInteger(30, """ID of the Redmine report containing
+    registry.NonNegativeInteger(134, """ID of the Redmine report containing
     non-triaged issues"""))
 
 conf.registerChannelValue(
